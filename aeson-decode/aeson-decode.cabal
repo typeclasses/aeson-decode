@@ -42,7 +42,7 @@ library
       aeson
     , base >=4.7 && <5
     , containers
-    , data-default
+    , data-default-class
     , text
     , unordered-containers
     , vector
@@ -62,3 +62,14 @@ test-suite hedgehog
     , hedgehog
     , text
     , time
+
+test-suite doctest
+  default-language: Haskell2010
+  type: exitcode-stdio-1.0
+  main-is: doctest.hs
+  hs-source-dirs: test
+  ghc-options: -Wall -threaded
+
+  build-depends:
+      base >=4.9 && <4.12
+    , doctest
