@@ -22,7 +22,7 @@ module AesonDecode
   -- * Hash map
   , hashMapOf
   -- * Null
-  , null
+  , null, nullable
 
   ) where
 
@@ -146,6 +146,14 @@ null :: Decoder ()
 null = Decoder $ \case
   Null -> Just ()
   _ -> Nothing
+
+-- | @'nullable' d@:
+--
+-- * Succeeds with @'Just' x@ if the decoder @d@ succeeds with value @x@.
+-- * Succeeds with 'Nothing' if the JSON value is null.
+-- * Fails otherwise.
+nullable :: Decoder a -> Decoder (Maybe a)
+nullable d = (Just <$> d) <|> (Nothing <$ null)
 
 
 --------------------------------------------------------------------------------
