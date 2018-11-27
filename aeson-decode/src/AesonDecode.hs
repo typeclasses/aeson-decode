@@ -6,6 +6,7 @@ module AesonDecode
   -- * Decoder
     Decoder (..), constDecoder, constSuccessDecoder, failDecoder
   , mapDecoder, apDecoder, composeDecoderFunctions, orElse, defaultDecoder, is
+  , (^?)
   -- * Path
   , Path (..), here, stringPath, textPath, at, only
   -- * Text
@@ -62,6 +63,10 @@ import Data.Vector (Vector)
 --
 -- >>> import Data.Aeson.QQ (aesonQQ)
 
+(^?) :: Value -> Decoder a -> Maybe a
+val ^? Decoder f = f val
+infixl 8 ^?
+
 
 --------------------------------------------------------------------------------
 --  Decoder
@@ -112,7 +117,7 @@ constDecoder x = Decoder (const x)
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (constSuccessDecoder 6) undefined
+-- >>> undefined ^? constSuccessDecoder 6
 -- Just 6
 
 constSuccessDecoder :: a -> Decoder a
@@ -124,7 +129,7 @@ constSuccessDecoder x = constDecoder (Just x)
 --
 -- ==== Examples
 --
--- >>> decodeMaybe failDecoder undefined
+-- >>> undefined ^? failDecoder
 -- Nothing
 
 failDecoder :: Decoder a
@@ -133,10 +138,12 @@ failDecoder = constDecoder Nothing
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe (mapDecoder (+ 1) integer) [aesonQQ| 4 |]
+-- >>> d = mapDecoder (+ 1) integer
+--
+-- >>> [aesonQQ| 4 |] ^? d
 -- Just 5
 --
--- >>> decodeMaybe (mapDecoder (+ 1) integer) [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? d
 -- Nothing
 
 mapDecoder :: (a -> b) -> Decoder a -> Decoder b
@@ -147,7 +154,7 @@ mapDecoder f (Decoder d) = Decoder ((fmap . fmap) f d)
 --
 -- >>> d = (,) `mapDecoder` (at "x" integer) `apDecoder` (at "y" text)
 --
--- >>> decodeMaybe d [aesonQQ| {"x": 4, "y": "abc"} |]
+-- >>> [aesonQQ| {"x": 4, "y": "abc"} |] ^? d
 -- Just (4,"abc")
 
 apDecoder :: Decoder (a -> b) -> Decoder a -> Decoder b
@@ -161,7 +168,7 @@ apDecoder (Decoder ff) (Decoder fx) = Decoder $ \v ->
 -- >>> f x = at (textPath x) text
 -- >>> d = composeDecoderFunctions f f "a"
 --
--- >>> decodeMaybe d [aesonQQ| {"a": "b", "b": "c"} |]
+-- >>> [aesonQQ| {"a": "b", "b": "c"} |] ^? d
 -- Just "c"
 
 composeDecoderFunctions
@@ -179,13 +186,13 @@ composeDecoderFunctions f g a =
 --
 -- >>> d = orElse (Left <$> text) (Right <$> integer)
 --
--- >>> decodeMaybe d [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? d
 -- Just (Right 4)
 --
--- >>> decodeMaybe d [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? d
 -- Just (Left "x")
 --
--- >>> decodeMaybe d [aesonQQ| null |]
+-- >>> [aesonQQ| null |] ^? d
 -- Nothing
 
 orElse :: Decoder a -> Decoder a -> Decoder a
@@ -195,13 +202,13 @@ orElse (Decoder a) (Decoder b) = Decoder $ \v ->
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe defaultDecoder [aesonQQ| 4 |] :: Maybe Integer
+-- >>> [aesonQQ| 4 |] ^? defaultDecoder :: Maybe Integer
 -- Just 4
 --
--- >>> decodeMaybe defaultDecoder [aesonQQ| "x" |] :: Maybe String
+-- >>> [aesonQQ| "x" |] ^? defaultDecoder :: Maybe String
 -- Just "x"
 --
--- >>> decodeMaybe defaultDecoder [aesonQQ| [4,5,6] |] :: Maybe [Integer]
+-- >>> [aesonQQ| [4,5,6] |] ^? defaultDecoder :: Maybe [Integer]
 -- Just [4,5,6]
 
 defaultDecoder :: FromJSON a => Decoder a
@@ -212,10 +219,10 @@ defaultDecoder = Decoder $ \v -> Aeson.parseMaybe Aeson.parseJSON v
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (is 4) [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? is 4
 -- Just ()
 --
--- >>> decodeMaybe (is 4) [aesonQQ| 5 |]
+-- >>> [aesonQQ| 5 |] ^? is 4
 -- Nothing
 
 is :: (Eq a, FromJSON a) => a -> Decoder ()
@@ -267,13 +274,13 @@ at (Path f1) (Decoder f2) = Decoder (f1 >=> f2)
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (at only integer) [aesonQQ| [] |]
+-- >>> [aesonQQ| [] |] ^? at only integer
 -- Nothing
 --
--- >>> decodeMaybe (at only integer) [aesonQQ| [4] |]
+-- >>> [aesonQQ| [4] |] ^? at only integer
 -- Just 4
 --
--- >>> decodeMaybe (at only integer) [aesonQQ| [4,5] |]
+-- >>> [aesonQQ| [4,5] |] ^? at only integer
 -- Nothing
 
 only :: Path
@@ -291,13 +298,13 @@ only = Path $ \case
 --
 -- ==== Examples
 --
--- >>> decodeMaybe null [aesonQQ| null |]
+-- >>> [aesonQQ| null |] ^? null
 -- Just ()
 --
--- >>> decodeMaybe null [aesonQQ| [] |]
+-- >>> [aesonQQ| [] |] ^? null
 -- Nothing
 --
--- >>> decodeMaybe null [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? null
 -- Nothing
 
 null :: Decoder ()
@@ -313,13 +320,13 @@ null = Decoder $ \case
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (nullable integer) [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? nullable integer
 -- Just (Just 4)
 --
--- >>> decodeMaybe (nullable integer) [aesonQQ| null |]
+-- >>> [aesonQQ| null |] ^? nullable integer
 -- Just Nothing
 --
--- >>> decodeMaybe (nullable integer) [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? nullable integer
 -- Nothing
 
 nullable :: Decoder a -> Decoder (Maybe a)
@@ -334,10 +341,10 @@ nullable d = (Just <$> d) <|> (Nothing <$ null)
 --
 -- ==== Examples
 --
--- >>> decodeMaybe text [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? text
 -- Just "x"
 --
--- >>> decodeMaybe text [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? text
 -- Nothing
 
 text :: Decoder Text
@@ -348,10 +355,10 @@ text = defaultDecoder
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (textIs "x") [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? textIs "x"
 -- Just ()
 --
--- >>> decodeMaybe (textIs "x") [aesonQQ| "a" |]
+-- >>> [aesonQQ| "a" |] ^? textIs "x"
 -- Nothing
 
 textIs :: Text -> Decoder ()
@@ -366,10 +373,10 @@ textIs = is
 --
 -- ==== Examples
 --
--- >>> decodeMaybe integer [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? integer
 -- Just 4
 --
--- >>> decodeMaybe integer [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? integer
 -- Nothing
 
 integer :: Decoder Integer
@@ -380,10 +387,10 @@ integer = defaultDecoder
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (integerIs 4) [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? integerIs 4
 -- Just ()
 --
--- >>> decodeMaybe (integerIs 4) [aesonQQ| 5 |]
+-- >>> [aesonQQ| 5 |] ^? integerIs 4
 -- Nothing
 
 integerIs :: Integer -> Decoder ()
@@ -398,13 +405,13 @@ integerIs = is
 --
 -- ==== Examples
 --
--- >>> decodeMaybe bool [aesonQQ| true |]
+-- >>> [aesonQQ| true |] ^? bool
 -- Just True
 --
--- >>> decodeMaybe bool [aesonQQ| false |]
+-- >>> [aesonQQ| false |] ^? bool
 -- Just False
 --
--- >>> decodeMaybe bool [aesonQQ| "x" |]
+-- >>> [aesonQQ| "x" |] ^? bool
 -- Nothing
 
 bool :: Decoder Bool
@@ -415,10 +422,10 @@ bool = defaultDecoder
 --
 -- ==== Examples
 --
--- >>> decodeMaybe (boolIs True) [aesonQQ| true |]
+-- >>> [aesonQQ| true |] ^? boolIs True
 -- Just ()
 --
--- >>> decodeMaybe (boolIs True) [aesonQQ| false |]
+-- >>> [aesonQQ| false |] ^? boolIs True
 -- Nothing
 
 boolIs :: Bool -> Decoder ()
@@ -429,10 +436,10 @@ boolIs = is
 --
 -- ==== Examples
 --
--- >>> decodeMaybe true [aesonQQ| true |]
+-- >>> [aesonQQ| true |] ^? true
 -- Just ()
 --
--- >>> decodeMaybe true [aesonQQ| false |]
+-- >>> [aesonQQ| false |] ^? true
 -- Nothing
 
 true :: Decoder ()
@@ -443,10 +450,10 @@ true = is True
 --
 -- ==== Examples
 --
--- >>> decodeMaybe false [aesonQQ| false |]
+-- >>> [aesonQQ| false |] ^? false
 -- Just ()
 --
--- >>> decodeMaybe false [aesonQQ| true |]
+-- >>> [aesonQQ| true |] ^? false
 -- Nothing
 
 false :: Decoder ()
@@ -460,13 +467,13 @@ false = is False
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe (vectorOf integer) [aesonQQ| [] |]
+-- >>> [aesonQQ| [] |] ^? vectorOf integer
 -- Just []
 --
--- >>> decodeMaybe (vectorOf integer) [aesonQQ| [4,5,6] |]
+-- >>> [aesonQQ| [4,5,6] |] ^? vectorOf integer
 -- Just [4,5,6]
 --
--- >>> decodeMaybe (vectorOf integer) [aesonQQ| ["4","5","6"] |]
+-- >>> [aesonQQ| ["4","5","6"] |] ^? vectorOf integer
 -- Nothing
 
 vectorOf :: Decoder a -> Decoder (Vector a)
@@ -482,13 +489,13 @@ vectorOf d = Decoder $ \case
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe (listOf integer) [aesonQQ| [] |]
+-- >>> [aesonQQ| [] |] ^? listOf integer
 -- Just []
 --
--- >>> decodeMaybe (listOf integer) [aesonQQ| [4,5,6] |]
+-- >>> [aesonQQ| [4,5,6] |] ^? listOf integer
 -- Just [4,5,6]
 --
--- >>> decodeMaybe (listOf integer) [aesonQQ| ["4","5","6"] |]
+-- >>> [aesonQQ| ["4","5","6"] |] ^? listOf integer
 -- Nothing
 
 listOf :: Decoder a -> Decoder [a]
@@ -502,13 +509,13 @@ listOf d = toList <$> vectorOf d
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe (hashMapOf integer) [aesonQQ| {} |]
+-- >>> [aesonQQ| {} |] ^? hashMapOf integer
 -- Just (fromList [])
 --
--- >>> decodeMaybe (hashMapOf integer) [aesonQQ| {"a": 4, "b": 5} |]
+-- >>> [aesonQQ| {"a": 4, "b": 5} |] ^? hashMapOf integer
 -- Just (fromList [("a",4),("b",5)])
 --
--- >>> decodeMaybe (hashMapOf integer) [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? hashMapOf integer
 -- Nothing
 
 hashMapOf :: Decoder a -> Decoder (HashMap Text a)
@@ -524,13 +531,13 @@ hashMapOf d = Decoder $ \case
 -- |
 -- ==== Examples
 --
--- >>> decodeMaybe (ordMapOf integer) [aesonQQ| {} |]
+-- >>> [aesonQQ| {} |] ^? ordMapOf integer
 -- Just (fromList [])
 --
--- >>> decodeMaybe (ordMapOf integer) [aesonQQ| {"a": 4, "b": 5} |]
+-- >>> [aesonQQ| {"a": 4, "b": 5} |] ^? ordMapOf integer
 -- Just (fromList [("a",4),("b",5)])
 --
--- >>> decodeMaybe (ordMapOf integer) [aesonQQ| 4 |]
+-- >>> [aesonQQ| 4 |] ^? ordMapOf integer
 -- Nothing
 
 ordMapOf :: Decoder a -> Decoder (Map Text a)

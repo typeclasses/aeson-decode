@@ -40,9 +40,9 @@ prop_either = withTests 1 $ property $ do
   let
     d :: Decoder (Either Text Integer) = (text <&> Left) <|> (integer <&> Right)
 
-  decodeMaybe d [aesonQQ|"x"|]  === Just (Left "x")
-  decodeMaybe d [aesonQQ|5|]    === Just (Right 5)
-  decodeMaybe d [aesonQQ|null|] === Nothing
+  [aesonQQ| "x"  |] ^? d === Just (Left "x")
+  [aesonQQ| 5    |] ^? d === Just (Right 5)
+  [aesonQQ| null |] ^? d === Nothing
 
 prop_eitherTagged :: Property
 prop_eitherTagged = withTests 1 $ property $ do
@@ -51,9 +51,9 @@ prop_eitherTagged = withTests 1 $ property $ do
       (at "type" (textIs "x") *> at "value" integer <&> Left) <|>
       (at "type" (textIs "y") *> at "value" integer <&> Right)
 
-  decodeMaybe d [aesonQQ|{"type": "x", "value": 1}|] === Just (Left 1)
-  decodeMaybe d [aesonQQ|{"type": "y", "value": 2}|] === Just (Right 2)
-  decodeMaybe d [aesonQQ|{"type": "z", "value": 3}|] === Nothing
+  [aesonQQ| {"type": "x", "value": 1} |] ^? d === Just (Left 1)
+  [aesonQQ| {"type": "y", "value": 2} |] ^? d === Just (Right 2)
+  [aesonQQ| {"type": "z", "value": 3} |] ^? d === Nothing
 
 data Asset
   = Asset'Image Text
@@ -94,7 +94,7 @@ prop_asset = withTests 1 $ property $ do
         }
         |]
 
-  decodeMaybe d json === Just
+  json ^? d === Just
     [ Asset'Video "https://subscriber.typeclasses.com/video/js-operators-2/dash/manifest.mpd"
                   "/_/static/operators-video.jpg"
     , Asset'Image "/_/static/acme.jpg"
@@ -164,4 +164,4 @@ prop_cloudFrontPolicy = withTests 1 $ property $ do
         (EndTime 1357034400)
         (IpAddress "192.0.2.0/24")
 
-  decodeMaybe d json === Just p
+  json ^? d === Just p
