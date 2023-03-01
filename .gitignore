@@ -1,2 +1,9 @@
-cabal.config
-.stack-work/
+*.config
+*.local
+.stack-work
+dist
+dist-*
+result
+result-*
+*.yml
+*.yaml
